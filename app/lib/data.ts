@@ -11,17 +11,18 @@ import { formatCurrency } from './utils';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
+// 营业收入
 export async function fetchRevenue() {
   try {
     // Artificially delay a response for demo purposes.
     // Don't do this in production :)
 
-    // console.log('Fetching revenue data...');
-    // await new Promise((resolve) => setTimeout(resolve, 3000));
+    console.log('Fetching revenue data...');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const data = await sql<Revenue[]>`SELECT * FROM revenue`;
 
-    // console.log('Data fetch completed after 3 seconds.');
+    console.log('Data fetch completed after 2 seconds.');
 
     return data;
   } catch (error) {
@@ -30,8 +31,12 @@ export async function fetchRevenue() {
   }
 }
 
+// 最新发票
 export async function fetchLatestInvoices() {
   try {
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     const data = await sql<LatestInvoiceRaw[]>`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
       FROM invoices
@@ -50,28 +55,32 @@ export async function fetchLatestInvoices() {
   }
 }
 
+// 卡片数据
 export async function fetchCardData() {
   try {
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
     // how to initialize multiple queries in parallel with JS.
-    const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`;
-    const customerCountPromise = sql`SELECT COUNT(*) FROM customers`;
+    const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices`; // 发票数量
+    const customerCountPromise = sql`SELECT COUNT(*) FROM customers`; // 客户数量
+    // 计算已支付和待支付的发票总额
     const invoiceStatusPromise = sql`SELECT
          SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
          SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
          FROM invoices`;
 
+    // Promise.all allows us to run multiple promises in parallel
+    // and wait for all of them to resolve.
     const data = await Promise.all([
       invoiceCountPromise,
       customerCountPromise,
       invoiceStatusPromise,
     ]);
 
-    const numberOfInvoices = Number(data[0][0].count ?? '0');
-    const numberOfCustomers = Number(data[1][0].count ?? '0');
-    const totalPaidInvoices = formatCurrency(data[2][0].paid ?? '0');
-    const totalPendingInvoices = formatCurrency(data[2][0].pending ?? '0');
+    const numberOfInvoices = Number(data[0][0].count ?? '0'); // 发票数量
+    const numberOfCustomers = Number(data[1][0].count ?? '0'); // 客户数量
+    const totalPaidInvoices = formatCurrency(data[2][0].paid ?? '0'); // 已支付发票总额
+    const totalPendingInvoices = formatCurrency(data[2][0].pending ?? '0'); // 待支付发票总额
 
     return {
       numberOfCustomers,
